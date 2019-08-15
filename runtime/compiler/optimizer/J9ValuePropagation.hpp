@@ -51,8 +51,9 @@ class ValuePropagation : public OMR::ValuePropagation
    virtual void constrainRecognizedMethod(TR::Node *node);
    virtual bool transformDirectLoad(TR::Node *node);
    virtual void doDelayedTransformations();
-   void transformCallToIconstWithHCRGuard(TR::TreeTop *callTree, int32_t result);
-   void transformCallToIconstInPlaceOrInDelayedTransformations(TR::TreeTop *callTree, int32_t result, bool isGlobal, bool inPlace = true);
+   void transformCallToNodeWithHCRGuard(TR::TreeTop *callTree, TR::Node *result);
+   void transformCallToIconstInPlaceOrInDelayedTransformations(TR::TreeTop *callTree, int32_t result, bool isGlobal, bool inPlace = true, bool requiresGuard = false);
+   void transformCallToNodeDelayedTransformations(TR::TreeTop *callTree, TR::Node *result, bool requiresGuard = false);
    uintptrj_t* getObjectLocationFromConstraint(TR::VPConstraint *constraint);
    bool isKnownStringObject(TR::VPConstraint *constraint);
    TR_YesNoMaybe isStringObject(TR::VPConstraint *constraint);
@@ -72,15 +73,17 @@ class ValuePropagation : public OMR::ValuePropagation
 
    private:
 
-   struct TreeIntResultPair {
+   struct TreeNodeResultPair {
       TR_ALLOC(TR_Memory::ValuePropagation)
       TR::TreeTop *_tree;
-      int32_t _result;
-      TreeIntResultPair(TR::TreeTop *tree, int32_t result) : _tree(tree), _result(result) {}
+      TR::Node *_result;
+      bool _requiresHCRGuard;
+      TreeNodeResultPair(TR::TreeTop *tree, TR::Node *result, bool requiresHCRGuard) 
+         : _tree(tree), _result(result), _requiresHCRGuard(requiresHCRGuard) {}
    };
 
    TR::VP_BCDSign **_bcdSignConstraints;
-   List<TreeIntResultPair> _callsToBeFoldedToIconst;
+   List<TreeNodeResultPair> _callsToBeFoldedToNode;
    };
 
 
