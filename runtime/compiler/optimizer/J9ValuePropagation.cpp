@@ -52,7 +52,7 @@
 J9::ValuePropagation::ValuePropagation(TR::OptimizationManager *manager)
    : OMR::ValuePropagation(manager),
      _bcdSignConstraints(NULL),
-     _callsToBeFoldedToIconst(trMemory())
+     _callsToBeFoldedToNode(trMemory())
    {
    }
 
@@ -100,13 +100,13 @@ TR::VP_BCDSign **J9::ValuePropagation::getBCDSignConstraints(TR::DataType dt)
  *    The constant used to replace the call in the fast path.
  */
 void
-J9::ValuePropagation::transformCallToIconstWithHCRGuard(TR::TreeTop *callTree, int32_t result)
+J9::ValuePropagation::transformCallToNodeWithHCRGuard(TR::TreeTop *callTree, TR::Node *result)
    {
    static const char *disableHCRGuards = feGetEnv("TR_DisableHCRGuards");
    TR_ASSERT(!disableHCRGuards && comp()->getHCRMode() != TR::none, "foldCallToConstantInHCRMode should be called in HCR mode");
 
    TR::Node * callNode = callTree->getNode()->getFirstChild();
-   TR_ASSERT(callNode->getSymbol()->isResolvedMethod(), "Expecting resolved call in transformCallToIconstWithHCRGuard");
+   TR_ASSERT(callNode->getSymbol()->isResolvedMethod(), "Expecting resolved call in transformCallToNodeWithHCRGuard");
 
    TR::ResolvedMethodSymbol *calleeSymbol = callNode->getSymbol()->castToResolvedMethodSymbol();
 
@@ -128,7 +128,8 @@ J9::ValuePropagation::transformCallToIconstWithHCRGuard(TR::TreeTop *callTree, i
    ifTree->getNode()->getFirstChild()->setIsTheVirtualCallNodeForAGuardedInlinedCall();
    // resultNode is the inlined node, should have the correct callee index
    // Pass compareNode as the originatingByteCodeNode so that the resultNode has the correct callee index
-   TR::Node *resultNode = TR::Node::iconst(compareNode, result);
+   TR::Node *resultNode = result;
+   result->setByteCodeInfo(compareNode->getByteCodeInfo());
    TR::TreeTop *elseTree = TR::TreeTop::create(comp(), TR::Node::create(callNode, TR::treetop, 1, resultNode));
    J9::TransformUtil::createDiamondForCall(this, callTree, compareTree, ifTree, elseTree, false /*changeBlockExtensions*/, true /*markCold*/);
    comp()->decInlineDepth();
@@ -180,7 +181,7 @@ J9::ValuePropagation::getObjectLocationFromConstraint(TR::VPConstraint *constrai
  *   If true, fold the call in place. Otherwise in delayed transformations.
  */
 void
-J9::ValuePropagation::transformCallToIconstInPlaceOrInDelayedTransformations(TR::TreeTop* callTree, int32_t result, bool isGlobal, bool inPlace)
+J9::ValuePropagation::transformCallToIconstInPlaceOrInDelayedTransformations(TR::TreeTop* callTree, int32_t result, bool isGlobal, bool inPlace, bool requiresGuard)
    {
     TR::Node * callNode = callTree->getNode()->getFirstChild();
     TR::Method * calledMethod = callNode->getSymbol()->castToMethodSymbol()->getMethod();
@@ -195,10 +196,20 @@ J9::ValuePropagation::transformCallToIconstInPlaceOrInDelayedTransformations(TR:
        {
        if (trace())
           traceMsg(comp(), "The call to %s on node %p will be folded to %d in delayed transformations\n", signature, callNode, result);
-       _callsToBeFoldedToIconst.add(new (trStackMemory()) TreeIntResultPair(callTree, result));
+       _callsToBeFoldedToNode.add(new (trStackMemory()) TreeNodeResultPair(callTree, TR::Node::iconst(callTree->getNode()->getFirstChild(), result), requiresGuard));
        }
-  }
+   }
 
+void
+J9::ValuePropagation::transformCallToNodeDelayedTransformations(TR::TreeTop *callTree, TR::Node *result, bool requiresGuard)
+   {
+   TR::Node * callNode = callTree->getNode()->getFirstChild();
+   TR::Method * calledMethod = callNode->getSymbol()->castToMethodSymbol()->getMethod();
+   const char *signature = calledMethod->signature(comp()->trMemory(), stackAlloc);
+   if (trace())
+          traceMsg(comp(), "The call to %s on node %p will be folded in delayed transformations\n", signature, callNode, result);
+   _callsToBeFoldedToNode.add(new (trStackMemory()) TreeNodeResultPair(callTree, result, requiresGuard));
+   }
 /**
  * \brief
  *    Check if the given constraint is for a java/lang/String object.
@@ -294,7 +305,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
              && receiverChildConstraint->getClassType()->asFixedClass())
             {
             int32_t isInterface = TR::Compiler->cls.isInterfaceClass(comp(), receiverChildConstraint->getClass());
-            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, isInterface, receiverChildGlobal, transformNonnativeMethodInPlace);
+            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, isInterface, receiverChildGlobal, transformNonnativeMethodInPlace, !transformNonnativeMethodInPlace);
             TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
             return;
             }
@@ -320,7 +331,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                   traceMsg(comp(), "Cannot get access to the String object, quit transforming String.hashCode\n");
                break;
                }
-            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, hashCode, receiverChildGlobal, transformNonnativeMethodInPlace);
+            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, hashCode, receiverChildGlobal, transformNonnativeMethodInPlace, !transformNonnativeMethodInPlace);
             TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
             return;
             }
@@ -344,7 +355,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             // According to java doc, String.equals returns false when the argument object is null
             if (objectChildConstraint->isNullObject())
                {
-               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, 0, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace);
+               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, 0, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace, !transformNonnativeMethodInPlace);
                TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                return;
                }
@@ -359,7 +370,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                }
             else if (isObjectString == TR_no)
                {
-               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, 0, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace);
+               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, 0, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace, !transformNonnativeMethodInPlace);
                TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                return;
                }
@@ -381,7 +392,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                         traceMsg(comp(), "Does not have VM access, cannot tell whether %p and %p are equal\n", receiverChild, objectChild);
                      break;
                      }
-                  transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, result, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace);
+                  transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, result, receiverChildGlobal && objectChildGlobal, transformNonnativeMethodInPlace, !transformNonnativeMethodInPlace);
                   TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                   return;
                   }
@@ -414,7 +425,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             len = comp()->fej9()->getStringLength(stringObject);
             }
             // java/lang/String.lengthInternal is used internally and HCR guards can be skipped for calls to it.
-            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, len, receiverChildGlobal, transformNonnativeMethodInPlace || rm == TR::java_lang_String_lengthInternal);
+            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, len, receiverChildGlobal, transformNonnativeMethodInPlace || rm == TR::java_lang_String_lengthInternal, !(transformNonnativeMethodInPlace || rm == TR::java_lang_String_lengthInternal));
             TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
             return;
             }
@@ -434,7 +445,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             bool success = comp()->fej9()->javaLangClassGetModifiersImpl(classChildConstraint->getClass(), modifiersForClass);
             if (!success)
                break;
-            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, modifiersForClass, classChildGlobal, true);
+            transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, modifiersForClass, classChildGlobal, true, false);
             TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
             return;
             }
@@ -488,7 +499,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                      traceMsg(comp(), "The second child class type is not resolved at compile-time, quit transforming Class.isAssignableFrom\n");
                   return;
                   }
-               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, assignable, firstClassChildGlobal && secondClassChildGlobal, true);
+               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, assignable, firstClassChildGlobal && secondClassChildGlobal, true, false);
                TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                return;
                }
@@ -511,7 +522,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             int32_t hashCodeForClass = comp()->fej9()->getJavaLangClassHashCode(comp(), classChildConstraint->getClass(), hashCodeWasComputed);
             if (hashCodeWasComputed)
                {
-               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, hashCodeForClass, classChildGlobal, true);
+               transformCallToIconstInPlaceOrInDelayedTransformations(_curTree, hashCodeForClass, classChildGlobal, true, false);
                TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                return;
                }
@@ -645,6 +656,139 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                invalidateValueNumberInfo();
                TR::DebugCounter::incStaticDebugCounter(comp(), TR::DebugCounter::debugCounterName(comp(), "constrainCall/(%s)", signature));
                return;
+               }
+            }
+         break;
+         }
+      case TR::java_lang_String_indexOf_native:
+         {
+         TR::Node *stringNode = node->getFirstChild();
+         bool isGlobal = true;
+         bool isGlobalQuery;
+         TR::VPConstraint *stringConstraint = getConstraint(stringNode, isGlobalQuery);
+         if (!stringConstraint || !stringConstraint->getKnownObject())
+            break;
+         isGlobal &= isGlobalQuery;
+         
+         TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
+         TR::VPKnownObject *kobj = stringConstraint->getKnownObject();
+         if (knot && kobj)
+            {
+            TR::VMAccessCriticalSection constrainIndexOfCriticalSection(comp(),
+                           TR::VMAccessCriticalSection::tryToAcquireVMAccess);
+            if (constrainIndexOfCriticalSection.hasVMAccess())
+               {
+               uintptrj_t string = knot->getPointer(kobj->getIndex());
+               if (comp()->fej9()->isString(string))
+                  {
+                  int32_t length = comp()->fej9()->getStringLength(string);
+                  if (length == 0)
+                     {
+                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
+                     return;
+                     }
+                  }
+               }
+            }
+         break;
+         }
+      case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:
+         {
+         TR::Node *array = node->getSecondChild();
+         bool isGlobal = true;
+         bool isGlobalQuery;
+         TR::VPConstraint *arrayConstraint = getConstraint(array, isGlobalQuery);
+         if (!arrayConstraint)
+            break;
+         isGlobal &= isGlobalQuery;
+
+         TR::Node *startNode = node->getChild(3);
+         TR::VPConstraint *startConstraint = getConstraint(startNode, isGlobalQuery);
+         if (!startConstraint || !startConstraint->asIntConst())
+            break;
+         int32_t start = startConstraint->asIntConst()->getInt();
+         isGlobal &= isGlobalQuery;
+
+         TR::Node *lengthNode = node->getChild(4);
+         TR::VPConstraint *lengthConstraint = getConstraint(lengthNode, isGlobalQuery);
+         if (!lengthConstraint || !lengthConstraint->asIntConst())
+            break;
+         int32_t length = lengthConstraint->asIntConst()->getInt();
+         isGlobal &= isGlobalQuery;
+
+         TR::Node *searchNode = node->getChild(2);
+         TR::VPConstraint *searchConstraint = getConstraint(searchNode, isGlobal);
+         bool constChar = searchConstraint && searchConstraint->asShortConst();
+         uint16_t searchChar = constChar ? (uint16_t)searchConstraint->asShortConst()->getShort() : -1;
+         if (constChar)
+            isGlobal &= isGlobalQuery;
+
+         TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
+         TR::VPKnownObject *kobj = arrayConstraint->getKnownObject();
+         if (knot && kobj)
+            {
+            TR_OpaqueClassBlock *klazz = kobj->getClass();
+            if (comp()->fej9()->isPrimitiveArray(klazz)
+                || comp()->fej9()->isReferenceArray(klazz))
+               {
+               TR::VMAccessCriticalSection constrainArraylengthCriticalSection(comp(),
+                           TR::VMAccessCriticalSection::tryToAcquireVMAccess);
+               if (constrainArraylengthCriticalSection.hasVMAccess())
+                  {
+                  uintptrj_t array = knot->getPointer(kobj->getIndex());
+                  if (length == 0)
+                     {
+                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
+                     return;
+                     }
+                  else if (constChar)
+                     {
+                     for (int32_t i = start; i < length; ++i)
+                        {
+                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                        uint16_t ch  = *((uint16_t*)element);
+                        if (ch == searchChar)
+                           {
+                           replaceByConstant(node, TR::VPIntConst::create(this, i), isGlobal);
+                           return;
+                           }
+                        }
+                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
+                     return;
+                     }
+                  else if (length == 1)
+                     {
+                     uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, start + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                     uint16_t ch  = *((uint16_t*)element);
+                     transformCallToNodeDelayedTransformations(_curTree, 
+                        TR::Node::create(node, TR::isub, 2,
+                           TR::Node::create(node, TR::icmpeq, 2,
+                              node->getChild(2),
+                              TR::Node::iconst(node, ch)
+                           ),
+                           TR::Node::iconst(node, 1)
+                        )
+                        , false);
+                     return;
+                     }
+                  else if (length < 4)
+                     {
+                     TR::Node *root = TR::Node::iconst(node, -1);
+                     for (int32_t i = length - 1; i >= 0; --i)
+                        {
+                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                        uint16_t ch  = *((uint16_t*)element);
+                        root = TR::Node::create(TR::iternary, 3,
+                           TR::Node::create(node, TR::icmpeq, 2,
+                              node->getChild(2),
+                              TR::Node::iconst(node, ch)),
+                           TR::Node::iconst(node, i),
+                           root);
+                        }
+                     transformCallToNodeDelayedTransformations(_curTree, root, false);
+                     return;
+                     }
+                  }
                }
             }
          break;
@@ -928,23 +1072,29 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
 void
 J9::ValuePropagation::doDelayedTransformations()
    {
-   ListIterator<TreeIntResultPair> callsToBeFoldedToIconst(&_callsToBeFoldedToIconst);
-   for (TreeIntResultPair *it = callsToBeFoldedToIconst.getFirst();
+   ListIterator<TreeNodeResultPair> callsToBeFoldedToNode(&_callsToBeFoldedToNode);
+   for (TreeNodeResultPair *it = callsToBeFoldedToNode.getFirst();
         it;
-        it = callsToBeFoldedToIconst.getNext())
+        it = callsToBeFoldedToNode.getNext())
       {
       TR::TreeTop *callTree = it->_tree;
-      int32_t result = it->_result;
+      TR::Node *result = it->_result;
       TR::Node * callNode = callTree->getNode()->getFirstChild();
-      TR::Method * calledMethod = callNode->getSymbol()->castToMethodSymbol()->getMethod();
-      const char *signature = calledMethod->signature(comp()->trMemory(), stackAlloc);
+      traceMsg(comp(), "Doing delayed call transformaiton on call node n%dn\n", callNode->getGlobalIndex());
 
-      if (!performTransformation(comp(), "%sTransforming call %s on node %p on tree %p to iconst %d\n", OPT_DETAILS, signature, callNode, callTree, result))
+      if (!performTransformation(comp(), "%sTransforming call node %p on tree %p to node %p\n", OPT_DETAILS, callNode, callTree, result))
          break;
 
-      transformCallToIconstWithHCRGuard(callTree, result);
+      if (it->_requiresHCRGuard)
+         {
+         transformCallToNodeWithHCRGuard(callTree, result);
+         }
+      else
+         {
+         TR::TransformUtil::transformCallNodeToPassThrough(this, callNode, callTree, result);
+         }
       }
-   _callsToBeFoldedToIconst.deleteAll();
+   _callsToBeFoldedToNode.deleteAll();
 
    OMR::ValuePropagation::doDelayedTransformations();
    }
