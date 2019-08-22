@@ -745,7 +745,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                      {
                      for (int32_t i = start; i < length; ++i)
                         {
-                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2*i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
                         uint16_t ch  = *((uint16_t*)element);
                         if (ch == searchChar)
                            {
@@ -758,7 +758,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                      }
                   else if (length == 1)
                      {
-                     uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, start + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                     uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2 * start) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
                      uint16_t ch  = *((uint16_t*)element);
                      transformCallToNodeDelayedTransformations(_curTree, 
                         TR::Node::create(node, TR::isub, 2,
@@ -776,7 +776,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                      TR::Node *root = TR::Node::iconst(node, -1);
                      for (int32_t i = length - 1; i >= 0; --i)
                         {
-                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2 * i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
                         uint16_t ch  = *((uint16_t*)element);
                         root = TR::Node::create(TR::iternary, 3,
                            TR::Node::create(node, TR::icmpeq, 2,
