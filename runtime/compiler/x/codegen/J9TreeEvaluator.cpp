@@ -2236,7 +2236,7 @@ static bool isInteger(TR::ILOpCode &op, TR::CodeGenerator *cg)
    }
 
 
-static TR_X86OpCodes branchOpCodeForCompare(TR::ILOpCode &op, bool opposite=false)
+static TR_X86OpCodes branchOpCodeForCompare(TR::ILOpCode &op, X86Flags flag=ZeroFlag, bool opposite=false)
    {
    int32_t index = 0;
    if (op.isCompareTrueIfLess())
@@ -2251,14 +2251,22 @@ static TR_X86OpCodes branchOpCodeForCompare(TR::ILOpCode &op, bool opposite=fals
    if (opposite)
       index ^= 7;
 
-   static const TR_X86OpCodes opTable[] =
+   static const TR_X86OpCodes zeroOpTable[] =
       {
       BADIA32Op,  JL4,  JG4,  JNE4,
       JE4,        JLE4, JGE4, BADIA32Op,
       BADIA32Op,  JB4,  JA4,  JNE4,
       JE4,        JBE4, JAE4, BADIA32Op,
       };
-   return opTable[index];
+   static const TR_X86OpCodes carryOpTable[] =
+      {
+      BADIA32Op,  BADIA32Op, BADIA32Op, JB4,
+      JAE4,        BADIA32Op, BADIA32Op, BADIA32Op,
+      BADIA32Op,  BADIA32Op, BADIA32Op, JB4,
+      JAE4,        BADIA32Op, BADIA32Op, BADIA32Op,
+      };
+      
+   return flag == ZeroFlag ? zeroOpTable[index] : carryOpTable[index];
    }
 
 
@@ -2315,6 +2323,7 @@ TR::Register *J9::X86::TreeEvaluator::ZEROCHKEvaluator(TR::Node *node, TR::CodeG
      && isInteger(valueToCheck->getChild(1)->getOpCode(), cg)
      && performTransformation(comp, "O^O CODEGEN Optimizing ZEROCHK+%s %s\n", valueToCheck->getOpCode().getName(), valueToCheck->getName(cg->getDebug())))
       {
+      X86Flags flag = ZeroFlag;
       if (valueToCheck->getOpCode().isCompareForOrder())
          {
          TR::TreeEvaluator::compareIntegersForOrder(valueToCheck, cg);
@@ -2322,9 +2331,9 @@ TR::Register *J9::X86::TreeEvaluator::ZEROCHKEvaluator(TR::Node *node, TR::CodeG
       else
          {
          TR_ASSERT(valueToCheck->getOpCode().isCompareForEquality(), "Compare opcode must either be compare for order or for equality");
-         TR::TreeEvaluator::compareIntegersForEquality(valueToCheck, cg);
+         flag = TR::TreeEvaluator::compareIntegersForEquality(valueToCheck, cg);
          }
-      generateLabelInstruction(branchOpCodeForCompare(valueToCheck->getOpCode(), true), node, slowPathLabel, cg);
+      generateLabelInstruction(branchOpCodeForCompare(valueToCheck->getOpCode(), flag, true), node, slowPathLabel, cg);
       }
    else
       {
@@ -11079,6 +11088,7 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
 
    TR::Instruction *storeInstr = NULL;
    TR::Register *storeAddressRegForRealTime = NULL;
+   bool isVolatile = false;
 
    if (isRealTimeGC)
       {
@@ -11107,6 +11117,8 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
       {
       // Non-realtime does the store first, then the write barrier.
       //
+      isVolatile = storeMR->getSymbolReference().getSymbol()->isVolatile();
+      storeMR->setIgnoreVolatile();
       storeInstr = doReferenceStore(node, storeMR, translatedSourceReg, usingCompressedPointers, cg);
       }
 
@@ -11139,6 +11151,8 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
       generateImmSymInstruction(CALLImm4, node, (uintptrj_t)wrtBarSymRef->getMethodAddress(), wrtBarSymRef, cg);
 
       generateLabelInstruction(LABEL, node, doneWrtBarLabel, deps, cg);
+      if (isVolatile)
+         generateInstruction(MFENCE, node, cg);
       }
    else
       {
