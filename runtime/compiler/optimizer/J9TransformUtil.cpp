@@ -445,6 +445,8 @@ bool J9::TransformUtil::foldFinalFieldsIn(TR_OpaqueClassBlock *clazz, const char
       return true;
    else if (classNameLength >= 13 && !strncmp(className, "java/nio/Bits", 13))
       return true;
+   else if (classNameLength >= 21 && !strncmp(className, "java/lang/ThreadLocal", 21))
+      return true;
 
    if (classNameLength == 16 && !strncmp(className, "java/lang/System", 16))
       return false;
