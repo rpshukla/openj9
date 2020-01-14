@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2019 IBM Corp. and others
+ * Copyright (c) 2000, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -610,8 +610,6 @@ bool TR_J9InterfaceCallSite::findCallSiteTarget (TR_CallStack *callStack, TR_Inl
       //And try other techniques
       _ecsPrexArgInfo->set(0, NULL);
       }
-
-   //inliner->tracer()->dumpPrexArgInfo(_ecsPrexArgInfo);
 
    if (!_receiverClass)
       {
