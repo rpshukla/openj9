@@ -52,7 +52,7 @@ class ValuePropagation : public OMR::ValuePropagation
    virtual bool transformDirectLoad(TR::Node *node);
    virtual void doDelayedTransformations();
    void transformCallToNodeWithHCRGuard(TR::TreeTop *callTree, TR::Node *result);
-   void transformCallToIconstInPlaceOrInDelayedTransformations(TR::TreeTop *callTree, int32_t result, bool isGlobal, bool inPlace = true, bool requiresGuard = false);
+   void transformCallToNodeInPlaceOrInDelayedTransformations(TR::TreeTop *callTree, int32_t result, bool isGlobal, bool inPlace = true, bool requiresGuard = false);
    void transformCallToNodeDelayedTransformations(TR::TreeTop *callTree, TR::Node *result, bool requiresGuard = false);
    uintptrj_t* getObjectLocationFromConstraint(TR::VPConstraint *constraint);
    bool isKnownStringObject(TR::VPConstraint *constraint);
