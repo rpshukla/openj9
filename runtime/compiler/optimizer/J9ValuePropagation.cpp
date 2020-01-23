@@ -669,7 +669,7 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
          if (!stringConstraint || !stringConstraint->getKnownObject())
             break;
          isGlobal &= isGlobalQuery;
-         
+
          TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
          TR::VPKnownObject *kobj = stringConstraint->getKnownObject();
          if (knot && kobj)
@@ -1080,7 +1080,7 @@ J9::ValuePropagation::doDelayedTransformations()
       TR::TreeTop *callTree = it->_tree;
       TR::Node *result = it->_result;
       TR::Node * callNode = callTree->getNode()->getFirstChild();
-      traceMsg(comp(), "Doing delayed call transformaiton on call node n%dn\n", callNode->getGlobalIndex());
+      traceMsg(comp(), "Doing delayed call transformation on call node n%dn\n", callNode->getGlobalIndex());
 
       if (!performTransformation(comp(), "%sTransforming call node %p on tree %p to node %p\n", OPT_DETAILS, callNode, callTree, result))
          break;
