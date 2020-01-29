@@ -264,9 +264,11 @@ J9::ValuePropagation::isKnownStringObject(TR::VPConstraint *constraint)
 void
 J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
    {
+   traceMsg(comp(), "constrainRecognizedMethod for node %p\n", node);
    // Only constrain resolved calls
    if (!node->getSymbol()->isResolvedMethod())
       return;
+   traceMsg(comp(), "constrainRecognizedMethod: isResolvedMethod() returned true\n");
 
    const static char *disableVPFoldRecognizedMethod = feGetEnv("TR_disableVPFoldRecognizedMethod");
    if (disableVPFoldRecognizedMethod)
@@ -274,10 +276,18 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
    TR::ResolvedMethodSymbol* symbol = node->getSymbol()->getResolvedMethodSymbol();
    TR::RecognizedMethod rm = symbol->getRecognizedMethod();
    if(rm == TR::unknownMethod)
+      {
+      traceMsg(comp(), "constrainRecognizedMethod: TR:unknownMethod for node %p\n", node);
       return;
+      }
+   traceMsg(comp(), "constrainRecognizedMethod: not TR:unknownMethod for node %p\n", node);
    // Do not constraint a call node for a guarded inlined call
    if (node->isTheVirtualCallNodeForAGuardedInlinedCall())
+      {
+      traceMsg(comp(), "constrainRecognizedMethod: isTheVirtualCallNodeForAGuardedInlinedCall for node %p\n", node);
       return;
+      }
+   traceMsg(comp(), "constrainRecognizedMethod: not isTheVirtualCallNodeForAGuardedInlinedCall for node %p\n", node);
 
    TR_ResolvedMethod* calledMethod = symbol->getResolvedMethod();
    const char *signature = calledMethod->signature(comp()->trMemory(), stackAlloc);
@@ -660,30 +670,70 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             }
          break;
          }
+      case TR::java_lang_String_indexOf_String:
+         {
+         traceMsg(comp(), "TR::java_lang_String_indexOf_String:");
+         break;
+         }
+      case TR::java_lang_String_indexOf_String_int:
+         {
+         traceMsg(comp(), "TR::java_lang_String_indexOf_String_int:");
+         break;
+         }
+      case TR::java_lang_String_indexOf_fast:
+         {
+         traceMsg(comp(), "TR::java_lang_String_indexOf_fast:");
+         break;
+         }
+      case TR::java_lang_StringLatin1_indexOf:
+         {
+         traceMsg(comp(), "TR::java_lang_StringLatin1_indexOf:");
+         break;
+         }
+      case TR::java_lang_StringUTF16_indexOf:
+         {
+         traceMsg(comp(), "TR::java_lang_StringUTF16_indexOf:");
+         break;
+         }
       case TR::java_lang_String_indexOf_native:
          {
+         traceMsg(comp(), "TR::java_lang_String_indexOf_native:");
          TR::Node *stringNode = node->getFirstChild();
+         traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringNode: %p", stringNode);
          bool isGlobal = true;
          bool isGlobalQuery;
          TR::VPConstraint *stringConstraint = getConstraint(stringNode, isGlobalQuery);
+         if (stringConstraint)
+            traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint");
+         if (stringConstraint->isConstString())
+            {
+            traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint->isConstString()");
+            TR::VPConstString *constString = stringConstraint->getConstString();
+            traceMsg(comp(), "TR::java_lang_String_indexOf_native: first character %s\n", constString->charAt(0, comp()));
+            }
          if (!stringConstraint || !stringConstraint->getKnownObject())
             break;
+         traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint and stringConstraint->getKnownObject()");
          isGlobal &= isGlobalQuery;
 
          TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
          TR::VPKnownObject *kobj = stringConstraint->getKnownObject();
          if (knot && kobj)
             {
+            traceMsg(comp(), "TR::java_lang_String_indexOf_native: knot and kobj");
             TR::VMAccessCriticalSection constrainIndexOfCriticalSection(comp(),
                            TR::VMAccessCriticalSection::tryToAcquireVMAccess);
             if (constrainIndexOfCriticalSection.hasVMAccess())
+               traceMsg(comp(), "TR::java_lang_String_indexOf_native: hasVMAAccess");
                {
                uintptrj_t string = knot->getPointer(kobj->getIndex());
                if (comp()->fej9()->isString(string))
                   {
+                  traceMsg(comp(), "TR::java_lang_String_indexOf_native: isString");
                   int32_t length = comp()->fej9()->getStringLength(string);
                   if (length == 0)
                      {
+                     traceMsg(comp(), "length == 0 (java)\n");
                      replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
                      return;
                      }
@@ -692,8 +742,14 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             }
          break;
          }
+      case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfLatin1:
+         {
+         traceMsg(comp(), "TR::com_ibm_jit_JITHelpers_intrinsicIndexOfLatin1:");
+         break;
+         }
       case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:
          {
+         traceMsg(comp(), "TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:");
          TR::Node *array = node->getSecondChild();
          bool isGlobal = true;
          bool isGlobalQuery;
@@ -738,11 +794,13 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                   uintptrj_t array = knot->getPointer(kobj->getIndex());
                   if (length == 0)
                      {
+                     traceMsg(comp(), "length == 0 (ibm)\n");
                      replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
                      return;
                      }
                   else if (constChar)
                      {
+                     traceMsg(comp(), "const char (ibm)\n");
                      for (int32_t i = start; i < length; ++i)
                         {
                         uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2*i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
