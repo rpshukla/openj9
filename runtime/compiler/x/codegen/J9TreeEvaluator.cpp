@@ -11088,7 +11088,6 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
 
    TR::Instruction *storeInstr = NULL;
    TR::Register *storeAddressRegForRealTime = NULL;
-   bool isVolatile = false;
 
    if (isRealTimeGC)
       {
@@ -11117,8 +11116,6 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
       {
       // Non-realtime does the store first, then the write barrier.
       //
-      isVolatile = storeMR->getSymbolReference().getSymbol()->isVolatile();
-      storeMR->setIgnoreVolatile();
       storeInstr = doReferenceStore(node, storeMR, translatedSourceReg, usingCompressedPointers, cg);
       }
 
@@ -11151,8 +11148,6 @@ void J9::X86::TreeEvaluator::VMwrtbarWithStoreEvaluator(
       generateImmSymInstruction(CALLImm4, node, (uintptrj_t)wrtBarSymRef->getMethodAddress(), wrtBarSymRef, cg);
 
       generateLabelInstruction(LABEL, node, doneWrtBarLabel, deps, cg);
-      if (isVolatile)
-         generateInstruction(MFENCE, node, cg);
       }
    else
       {
