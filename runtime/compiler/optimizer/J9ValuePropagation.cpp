@@ -261,6 +261,88 @@ J9::ValuePropagation::isKnownStringObject(TR::VPConstraint *constraint)
           && (constraint->isConstString() || constraint->getKnownObject());
    }
 
+bool J9::ValuePropagation::transformIndexOfKnownString(TR::Node *indexOfNode, TR::Node *sourceStringNode, TR::Node *targetStringNode, bool is16Bit)
+   {
+   bool isGlobal = true;
+   bool isGlobalQuery;
+   TR::VPConstraint *sourceConstraint = getConstraint(sourceStringNode, isGlobalQuery);
+   if (!sourceConstraint)
+      return false;
+   isGlobal &= isGlobalQuery;
+
+   // TODO check if sourceStringNode is single char
+
+   if (sourceConstraint->isConstString())
+      {
+      TR::VPConstString *constString = sourceConstraint->getConstString();
+      TR::VMAccessCriticalSection transformIndexOfCriticalSection(
+         comp(),
+         TR::VMAccessCriticalSection::tryToAcquireVMAccess);
+      if (transformIndexOfCriticalSection.hasVMAccess())
+         {
+         uintptrj_t stringStaticAddr = (uintptrj_t)constString->getSymRef()->getSymbol()->castToStaticSymbol()->getStaticAddress();
+         uintptrj_t string = comp()->fej9()->getStaticReferenceFieldAtAddress(stringStaticAddr);
+         int32_t length = comp()->fej9()->getStringLength(string);
+
+         // TODO check if target is const char
+         if (length == 0)
+            {
+            replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
+            return true;
+            }
+         else if (length == 1)
+            {
+            if (is16Bit)
+               {
+               int16_t ch = TR::Compiler->cls.getStringCharacter(comp(), string, 0);
+               transformCallToNodeDelayedTransformations(
+                  _curTree,
+                  TR::Node::create(indexOfNode, TR::isub, 2,
+                        TR::Node::create(indexOfNode, TR::icmpeq, 2,
+                           targetStringNode,
+                           TR::Node::iconst(indexOfNode, ch)
+                        ),
+                        TR::Node::iconst(indexOfNode, 1)),
+                  false);
+               return true;
+               }
+            else
+               {
+               // TODO 8 bit
+               }
+            }
+         else if (length < 4)
+            {
+            if (is16Bit)
+               {
+               TR::Node *root = TR::Node::iconst(indexOfNode, -1);
+               for (int32_t i = length - 1; i >= 0; --i)
+                  {
+                  int16_t ch = TR::Compiler->cls.getStringCharacter(comp(), string, i);
+                  root = TR::Node::create(TR::iternary, 3,
+                     TR::Node::create(indexOfNode, TR::icmpeq, 2,
+                        targetStringNode,
+                        TR::Node::iconst(indexOfNode, ch)),
+                     TR::Node::iconst(indexOfNode, i),
+                     root);
+                  }
+               transformCallToNodeDelayedTransformations(_curTree, root, false);
+               return true;
+               }
+            else
+               {
+               // TODO 8 bit
+               }
+            }
+         }
+      }
+   else if (sourceConstraint->getKnownObject())
+      {
+      // TODO
+      }
+   return false;
+   }
+
 void
 J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
    {
@@ -703,14 +785,8 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
          bool isGlobal = true;
          bool isGlobalQuery;
          TR::VPConstraint *stringConstraint = getConstraint(stringNode, isGlobalQuery);
-         if (stringConstraint)
-            traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint");
-         if (stringConstraint->isConstString())
-            {
-            traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint->isConstString()");
-            TR::VPConstString *constString = stringConstraint->getConstString();
-            traceMsg(comp(), "TR::java_lang_String_indexOf_native: first character %s\n", constString->charAt(0, comp()));
-            }
+         if (transformIndexOfKnownString(node, stringNode, node->getSecondChild(), true))
+            return;
          if (!stringConstraint || !stringConstraint->getKnownObject())
             break;
          traceMsg(comp(), "TR::java_lang_String_indexOf_native: stringConstraint and stringConstraint->getKnownObject()");
