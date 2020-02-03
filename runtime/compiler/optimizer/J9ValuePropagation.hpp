@@ -73,6 +73,27 @@ class ValuePropagation : public OMR::ValuePropagation
 
    private:
 
+   /**
+    * \brief
+    *    Potentially transforms a call to a String indexOf method when the source string is a known object.
+    *
+    * \parm indexOfNode
+    *    Node corresponding to a call to an indexOf method.
+    *
+    * \parm sourceStringNode
+    *    Node corresponding to the source string (the string to search through).
+    *
+    * \parm targetStringNode
+    *    Node corresponding to the target string (the string to search for).
+    *
+    * \parm is16Bit
+    *    True if each character in the source string is 16 bits. If false, assumed to be 8 bits.
+    *
+    * \return
+    *    Return true if a transformation was performed, false otherwise.
+    */
+   bool transformIndexOfKnownString(TR::Node *indexOfNode, TR::Node *sourceStringNode, TR::Node *targetStringNode, bool is16Bit = true);
+
    struct TreeNodeResultPair {
       TR_ALLOC(TR_Memory::ValuePropagation)
       TR::TreeTop *_tree;
