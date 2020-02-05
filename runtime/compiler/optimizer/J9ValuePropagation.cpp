@@ -874,34 +874,6 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
                true))
             return;
          break;
-
-         /*
-         TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
-         TR::VPKnownObject *kobj = stringConstraint->getKnownObject();
-         if (knot && kobj)
-            {
-            traceMsg(comp(), "TR::java_lang_String_indexOf_native: knot and kobj");
-            TR::VMAccessCriticalSection constrainIndexOfCriticalSection(comp(),
-                           TR::VMAccessCriticalSection::tryToAcquireVMAccess);
-            if (constrainIndexOfCriticalSection.hasVMAccess())
-               traceMsg(comp(), "TR::java_lang_String_indexOf_native: hasVMAAccess");
-               {
-               uintptrj_t string = knot->getPointer(kobj->getIndex());
-               if (comp()->fej9()->isString(string))
-                  {
-                  traceMsg(comp(), "TR::java_lang_String_indexOf_native: isString");
-                  int32_t length = comp()->fej9()->getStringLength(string);
-                  if (length == 0)
-                     {
-                     traceMsg(comp(), "length == 0 (java)\n");
-                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
-                     return;
-                     }
-                  }
-               }
-            }
-         break;
-         */
          }
       case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfLatin1:
          {
@@ -911,104 +883,18 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
       case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:
          {
          traceMsg(comp(), "TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:");
-         TR::Node *array = node->getSecondChild();
-         bool isGlobal = true;
-         bool isGlobalQuery;
-         TR::VPConstraint *arrayConstraint = getConstraint(array, isGlobalQuery);
-         if (!arrayConstraint)
-            break;
-         isGlobal &= isGlobalQuery;
-
+         TR::Node *sourceStringNode = node->getSecondChild();
+         TR::Node *targetCharNode = node->getChild(2);
          TR::Node *startNode = node->getChild(3);
-         TR::VPConstraint *startConstraint = getConstraint(startNode, isGlobalQuery);
-         if (!startConstraint || !startConstraint->asIntConst())
-            break;
-         int32_t start = startConstraint->asIntConst()->getInt();
-         isGlobal &= isGlobalQuery;
-
          TR::Node *lengthNode = node->getChild(4);
-         TR::VPConstraint *lengthConstraint = getConstraint(lengthNode, isGlobalQuery);
-         if (!lengthConstraint || !lengthConstraint->asIntConst())
-            break;
-         int32_t length = lengthConstraint->asIntConst()->getInt();
-         isGlobal &= isGlobalQuery;
-
-         TR::Node *searchNode = node->getChild(2);
-         TR::VPConstraint *searchConstraint = getConstraint(searchNode, isGlobal);
-         bool constChar = searchConstraint && searchConstraint->asShortConst();
-         uint16_t searchChar = constChar ? (uint16_t)searchConstraint->asShortConst()->getShort() : -1;
-         if (constChar)
-            isGlobal &= isGlobalQuery;
-
-         TR::KnownObjectTable *knot = comp()->getOrCreateKnownObjectTable();
-         TR::VPKnownObject *kobj = arrayConstraint->getKnownObject();
-
-         if (knot && kobj)
-            {
-            TR_OpaqueClassBlock *klazz = kobj->getClass();
-            if (comp()->fej9()->isPrimitiveArray(klazz)
-                || comp()->fej9()->isReferenceArray(klazz))
-               {
-               TR::VMAccessCriticalSection constrainArraylengthCriticalSection(comp(),
-                           TR::VMAccessCriticalSection::tryToAcquireVMAccess);
-               if (constrainArraylengthCriticalSection.hasVMAccess())
-                  {
-                  uintptrj_t array = knot->getPointer(kobj->getIndex());
-                  if (length == 0)
-                     {
-                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
-                     return;
-                     }
-                  else if (constChar)
-                     {
-                     for (int32_t i = start; i < length; ++i)
-                        {
-                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2*i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
-                        uint16_t ch  = *((uint16_t*)element);
-                        if (ch == searchChar)
-                           {
-                           replaceByConstant(node, TR::VPIntConst::create(this, i), isGlobal);
-                           return;
-                           }
-                        }
-                     replaceByConstant(node, TR::VPIntConst::create(this, -1), isGlobal);
-                     return;
-                     }
-                  else if (length == 1)
-                     {
-                     uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2 * start) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
-                     uint16_t ch  = *((uint16_t*)element);
-                     transformCallToNodeDelayedTransformations(_curTree, 
-                        TR::Node::create(node, TR::isub, 2,
-                           TR::Node::create(node, TR::icmpeq, 2,
-                              node->getChild(2),
-                              TR::Node::iconst(node, ch)
-                           ),
-                           TR::Node::iconst(node, 1)
-                        )
-                        , false);
-                     return;
-                     }
-                  else if (length < 4)
-                     {
-                     TR::Node *root = TR::Node::iconst(node, -1);
-                     for (int32_t i = length - 1; i >= 0; --i)
-                        {
-                        uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), array, (2 * i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
-                        uint16_t ch  = *((uint16_t*)element);
-                        root = TR::Node::create(TR::iternary, 3,
-                           TR::Node::create(node, TR::icmpeq, 2,
-                              node->getChild(2),
-                              TR::Node::iconst(node, ch)),
-                           TR::Node::iconst(node, i),
-                           root);
-                        }
-                     transformCallToNodeDelayedTransformations(_curTree, root, false);
-                     return;
-                     }
-                  }
-               }
-            }
+         if (transformIndexOfKnownString(
+               node,
+               sourceStringNode,
+               targetCharNode,
+               startNode,
+               lengthNode,
+               true))
+            return;
          break;
          }
       }
