@@ -83,8 +83,16 @@ class ValuePropagation : public OMR::ValuePropagation
     * \parm sourceStringNode
     *    Node corresponding to the source string (the string to search through).
     *
-    * \parm targetStringNode
-    *    Node corresponding to the target string (the string to search for).
+    * \parm targetCharNode
+    *    Node corresponding to the target character (the character to search for).
+    *
+    * \parm startNode
+    *    The index in the source string at which to start searching from.
+    *    If NULL, search will start at index zero.
+    *
+    * \parm lengthNode
+    *    The length in characters of the source string.
+    *    If lengthNode is NULL, will attempt to determine length from constraint on sourceStringNode.
     *
     * \parm is16Bit
     *    True if each character in the source string is 16 bits. If false, assumed to be 8 bits.
@@ -92,7 +100,13 @@ class ValuePropagation : public OMR::ValuePropagation
     * \return
     *    Return true if a transformation was performed, false otherwise.
     */
-   bool transformIndexOfKnownString(TR::Node *indexOfNode, TR::Node *sourceStringNode, TR::Node *targetStringNode, bool is16Bit = true);
+   bool transformIndexOfKnownString(
+      TR::Node *indexOfNode,
+      TR::Node *sourceStringNode,
+      TR::Node *targetCharNode,
+      TR::Node *startNode,
+      TR::Node *lengthNode,
+      bool is16Bit = true);
 
    struct TreeNodeResultPair {
       TR_ALLOC(TR_Memory::ValuePropagation)
