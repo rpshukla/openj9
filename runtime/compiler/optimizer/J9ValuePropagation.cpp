@@ -267,7 +267,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
    TR::Node *targetCharNode,
    TR::Node *startNode,
    TR::Node *lengthNode,
-   bool is16Bit = true)
+   bool is16Bit)
    {
    // Keep track of whether or not all constraints are global.
    bool isGlobal = true;
