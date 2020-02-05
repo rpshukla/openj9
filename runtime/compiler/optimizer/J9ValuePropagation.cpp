@@ -296,8 +296,22 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       }
 
    TR::VPConstraint *targetConstraint = getConstraint(targetCharNode, isGlobal) ;
-   bool targetIsConstChar = targetConstraint && targetConstraint->asShortConst();
-   uint16_t targetChar = targetIsConstChar ? (uint16_t)targetConstraint->asShortConst()->getShort() : -1;
+   bool targetIsConstChar;
+   uint16_t targetChar = -1;
+   if (!targetConstraint)
+      {
+      targetIsConstChar = false;
+      }
+   else if (targetConstraint->asIntConst())
+      {
+      targetIsConstChar = true;
+      targetChar = targetConstraint->asIntConst()->getInt();
+      }
+   else if (targetConstraint->asShortConst())
+      {
+      targetIsConstChar = true;
+      targetChar = targetConstraint->asShortConst()->getShort();
+      }
    if (targetIsConstChar)
       isGlobal &= isGlobalQuery;
 
@@ -346,8 +360,40 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       length = comp()->fej9()->getStringLength(string);
       }
 
-   // TODO check if target is const char
-   if (length == 0)
+   if (targetIsConstChar)
+      {
+      for (int32_t i = start; i < length; ++i)
+         {
+         int16_t ch;
+         if (knownObject)
+            {
+            if (is16Bit)
+               {
+               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, (2 * i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+               ch  = *((uint16_t*)element);
+               }
+            else
+               {
+               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+               uint8_t chByte  = *((uint8_t*)element);
+               ch = chByte;
+               }
+            }
+         else
+            {
+            // getStringCharacter should handle both 8 bit and 16 bit strings
+            ch = TR::Compiler->cls.getStringCharacter(comp(), string, i);
+            }
+         if (ch == targetChar)
+            {
+            replaceByConstant(indexOfNode, TR::VPIntConst::create(this, i), isGlobal);
+            return true;
+            }
+         }
+      replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
+      return true;
+      }
+   else if (length == 0)
       {
       replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
       return true;
@@ -372,7 +418,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       else
          {
          // getStringCharacter should handle both 8 bit and 16 bit strings
-         ch = TR::Compiler->cls.getStringCharacter(comp(), string, 0);
+         ch = TR::Compiler->cls.getStringCharacter(comp(), string, start);
          }
       transformCallToNodeDelayedTransformations(
          _curTree,
@@ -388,6 +434,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
    else if (length < 4)
       {
       TR::Node *root = TR::Node::iconst(indexOfNode, -1);
+      // TODO account for non zero start index
       for (int32_t i = length - 1; i >= 0; --i)
          {
          int16_t ch;
@@ -395,12 +442,12 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
             {
             if (is16Bit)
                {
-               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, (2 * start) + (2 * i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, (2 * i) + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
                ch  = *((uint16_t*)element);
                }
             else
                {
-               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, start + i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
+               uintptrj_t element = TR::Compiler->om.getAddressOfElement(comp(), string, i + TR::Compiler->om.contiguousArrayHeaderSizeInBytes());
                int8_t chByte  = *((uint8_t*)element);
                ch = chByte;
                }
