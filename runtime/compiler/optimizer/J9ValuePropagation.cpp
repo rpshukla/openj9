@@ -325,6 +325,8 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       start = startConstraint->asIntConst()->getInt();
       isGlobal &= isGlobalQuery;
       }
+   if (start < 0)
+      start = 0;
 
    // If lengthNode was supplied, use it to determine length.
    // Otherwise, if sourceStringNode is ConstString, determine length after VMAccess is acquired.
@@ -360,7 +362,12 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       length = comp()->fej9()->getStringLength(string);
       }
 
-   if (targetIsConstChar)
+   if (length == 0 || start >= length)
+      {
+      replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
+      return true;
+      }
+   else if (targetIsConstChar)
       {
       for (int32_t i = start; i < length; ++i)
          {
@@ -390,11 +397,6 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
             return true;
             }
          }
-      replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
-      return true;
-      }
-   else if (length == 0)
-      {
       replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
       return true;
       }
@@ -434,7 +436,6 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
    else if (length < 4)
       {
       TR::Node *root = TR::Node::iconst(indexOfNode, -1);
-      // TODO account for non zero start index
       for (int32_t i = length - 1; i >= start; --i)
          {
          int16_t ch;
