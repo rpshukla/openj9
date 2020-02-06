@@ -910,8 +910,6 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
          TR::Node *sourceStringNode = node->getFirstChild();
          TR::Node *targetCharNode = node->getSecondChild();
          TR::Node *startNode = node->getChild(2);
-         bool isGlobal = true;
-         bool isGlobalQuery;
          if (transformIndexOfKnownString(
                node,
                sourceStringNode,
