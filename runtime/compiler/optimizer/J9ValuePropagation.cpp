@@ -435,7 +435,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       {
       TR::Node *root = TR::Node::iconst(indexOfNode, -1);
       // TODO account for non zero start index
-      for (int32_t i = length - 1; i >= 0; --i)
+      for (int32_t i = length - 1; i >= start; --i)
          {
          int16_t ch;
          if (knownObject)
