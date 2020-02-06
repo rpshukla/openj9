@@ -921,24 +921,20 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
          break;
          }
       case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfLatin1:
-         {
-         traceMsg(comp(), "TR::com_ibm_jit_JITHelpers_intrinsicIndexOfLatin1:");
-         break;
-         }
       case TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:
          {
-         traceMsg(comp(), "TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16:");
          TR::Node *sourceStringNode = node->getSecondChild();
          TR::Node *targetCharNode = node->getChild(2);
          TR::Node *startNode = node->getChild(3);
          TR::Node *lengthNode = node->getChild(4);
+         bool is16Bit = rm == TR::com_ibm_jit_JITHelpers_intrinsicIndexOfUTF16;
          if (transformIndexOfKnownString(
                node,
                sourceStringNode,
                targetCharNode,
                startNode,
                lengthNode,
-               true))
+               is16Bit))
             return;
          break;
          }
