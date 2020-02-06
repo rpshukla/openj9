@@ -910,13 +910,14 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
          traceMsg(comp(), "TR::java_lang_String_indexOf_native:");
          TR::Node *sourceStringNode = node->getFirstChild();
          TR::Node *targetCharNode = node->getSecondChild();
+         TR::Node *startNode = node->getChild(2);
          bool isGlobal = true;
          bool isGlobalQuery;
          if (transformIndexOfKnownString(
                node,
                sourceStringNode,
                targetCharNode,
-               NULL,
+               startNode,
                NULL,
                true))
             return;
