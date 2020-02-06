@@ -289,9 +289,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       if (!knot)
          return false;
       TR_OpaqueClassBlock *klazz = knownObject->getClass();
-      // TODO eliminate isReferenceArray?
-      if (!comp()->fej9()->isPrimitiveArray(klazz)
-          && !comp()->fej9()->isReferenceArray(klazz))
+      if (!comp()->fej9()->isPrimitiveArray(klazz))
          return false;
       }
 
