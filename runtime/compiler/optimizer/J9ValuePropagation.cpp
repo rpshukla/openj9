@@ -473,11 +473,9 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
 void
 J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
    {
-   traceMsg(comp(), "constrainRecognizedMethod for node %p\n", node);
    // Only constrain resolved calls
    if (!node->getSymbol()->isResolvedMethod())
       return;
-   traceMsg(comp(), "constrainRecognizedMethod: isResolvedMethod() returned true\n");
 
    const static char *disableVPFoldRecognizedMethod = feGetEnv("TR_disableVPFoldRecognizedMethod");
    if (disableVPFoldRecognizedMethod)
@@ -485,18 +483,10 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
    TR::ResolvedMethodSymbol* symbol = node->getSymbol()->getResolvedMethodSymbol();
    TR::RecognizedMethod rm = symbol->getRecognizedMethod();
    if(rm == TR::unknownMethod)
-      {
-      traceMsg(comp(), "constrainRecognizedMethod: TR:unknownMethod for node %p\n", node);
       return;
-      }
-   traceMsg(comp(), "constrainRecognizedMethod: not TR:unknownMethod for node %p\n", node);
    // Do not constraint a call node for a guarded inlined call
    if (node->isTheVirtualCallNodeForAGuardedInlinedCall())
-      {
-      traceMsg(comp(), "constrainRecognizedMethod: isTheVirtualCallNodeForAGuardedInlinedCall for node %p\n", node);
       return;
-      }
-   traceMsg(comp(), "constrainRecognizedMethod: not isTheVirtualCallNodeForAGuardedInlinedCall for node %p\n", node);
 
    TR_ResolvedMethod* calledMethod = symbol->getResolvedMethod();
    const char *signature = calledMethod->signature(comp()->trMemory(), stackAlloc);
@@ -879,34 +869,8 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             }
          break;
          }
-      case TR::java_lang_String_indexOf_String:
-         {
-         traceMsg(comp(), "TR::java_lang_String_indexOf_String:");
-         break;
-         }
-      case TR::java_lang_String_indexOf_String_int:
-         {
-         traceMsg(comp(), "TR::java_lang_String_indexOf_String_int:");
-         break;
-         }
-      case TR::java_lang_String_indexOf_fast:
-         {
-         traceMsg(comp(), "TR::java_lang_String_indexOf_fast:");
-         break;
-         }
-      case TR::java_lang_StringLatin1_indexOf:
-         {
-         traceMsg(comp(), "TR::java_lang_StringLatin1_indexOf:");
-         break;
-         }
-      case TR::java_lang_StringUTF16_indexOf:
-         {
-         traceMsg(comp(), "TR::java_lang_StringUTF16_indexOf:");
-         break;
-         }
       case TR::java_lang_String_indexOf_native:
          {
-         traceMsg(comp(), "TR::java_lang_String_indexOf_native:");
          TR::Node *sourceStringNode = node->getFirstChild();
          TR::Node *targetCharNode = node->getSecondChild();
          TR::Node *startNode = node->getChild(2);
