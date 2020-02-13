@@ -362,8 +362,11 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
 
    if (length == 0 || start >= length)
       {
-      replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
-      return true;
+      if (performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on empty string receiver with constant value of -1\n", OPT_DETAILS, indexOfNode))
+         {
+         replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
+         return true;
+         }
       }
    else if (targetIsConstChar)
       {
@@ -391,12 +394,18 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
             }
          if (ch == targetChar)
             {
-            replaceByConstant(indexOfNode, TR::VPIntConst::create(this, i), isGlobal);
-            return true;
+            if (performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with constant value of %d\n", OPT_DETAILS, indexOfNode, i))
+               {
+               replaceByConstant(indexOfNode, TR::VPIntConst::create(this, i), isGlobal);
+               return true;
+               }
             }
          }
-      replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
-      return true;
+      if (performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with constant value of -1\n", OPT_DETAILS, indexOfNode))
+         {
+         replaceByConstant(indexOfNode, TR::VPIntConst::create(this, -1), isGlobal);
+         return true;
+         }
       }
    else if (length == 1)
       {
@@ -420,6 +429,8 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
          // getStringCharacter should handle both 8 bit and 16 bit strings
          ch = TR::Compiler->cls.getStringCharacter(comp(), string, start);
          }
+      if (!performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with equivalent icmpeq tree\n", OPT_DETAILS, indexOfNode))
+         return false;
       transformCallToNodeDelayedTransformations(
          _curTree,
          TR::Node::create(indexOfNode, TR::isub, 2,
@@ -456,6 +467,8 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
             // getStringCharacter should handle both 8 bit and 16 bit strings
             ch = TR::Compiler->cls.getStringCharacter(comp(), string, i);
             }
+         if (!performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with equivalent iternary tree\n", OPT_DETAILS, indexOfNode))
+            return false;
          root = TR::Node::create(TR::iternary, 3,
             TR::Node::create(indexOfNode, TR::icmpeq, 2,
                targetCharNode,
