@@ -882,11 +882,12 @@ J9::ValuePropagation::constrainRecognizedMethod(TR::Node *node)
             }
          break;
          }
+      case TR::java_lang_String_indexOf_char:
       case TR::java_lang_String_indexOf_native:
          {
          TR::Node *sourceStringNode = node->getFirstChild();
          TR::Node *targetCharNode = node->getSecondChild();
-         TR::Node *startNode = node->getChild(2);
+         TR::Node *startNode = rm == TR::java_lang_String_indexOf_native ? node->getChild(2) : NULL;
          if (transformIndexOfKnownString(
                node,
                sourceStringNode,
