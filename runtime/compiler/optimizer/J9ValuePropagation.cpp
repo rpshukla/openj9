@@ -294,7 +294,7 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
       }
 
    TR::VPConstraint *targetConstraint = getConstraint(targetCharNode, isGlobal) ;
-   bool targetIsConstChar;
+   bool targetIsConstChar = false;
    uint16_t targetChar = -1;
    if (!targetConstraint)
       {
