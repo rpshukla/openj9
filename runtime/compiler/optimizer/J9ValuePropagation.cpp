@@ -467,9 +467,9 @@ bool J9::ValuePropagation::transformIndexOfKnownString(
             // getStringCharacter should handle both 8 bit and 16 bit strings
             ch = TR::Compiler->cls.getStringCharacter(comp(), string, i);
             }
-         if (!performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with equivalent iternary tree\n", OPT_DETAILS, indexOfNode))
+         if (!performTransformation(comp(), "%sReplacing indexOf call node [" POINTER_PRINTF_FORMAT "] on known string receiver with equivalent iselect tree\n", OPT_DETAILS, indexOfNode))
             return false;
-         root = TR::Node::create(TR::iternary, 3,
+         root = TR::Node::create(TR::iselect, 3,
             TR::Node::create(indexOfNode, TR::icmpeq, 2,
                targetCharNode,
                TR::Node::iconst(indexOfNode, ch)),
