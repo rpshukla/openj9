@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2000, 2019 IBM Corp. and others
+ * Copyright (c) 2000, 2020 IBM Corp. and others
  *
  * This program and the accompanying materials are made available under
  * the terms of the Eclipse Public License 2.0 which accompanies this
@@ -75,7 +75,7 @@ class ValuePropagation : public OMR::ValuePropagation
 
    /**
     * \brief
-    *    Potentially transforms a call to a String indexOf method when the source string is a known object.
+    *    Transforms a call to a String indexOf method when the source string is a known object.
     *
     * \parm indexOfNode
     *    Node corresponding to a call to an indexOf method.
