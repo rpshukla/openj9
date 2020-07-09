@@ -4526,7 +4526,7 @@ void TR::MonitorElimination::addCatchBlocks()
                }
 
             firstTime = false;
-            cfg->addExceptionEdge(block, catchBlock);
+            cfg->addExceptionEdgeUnchecked(block, catchBlock);
             if (trace())
                traceMsg(comp(), "Added edge from block_%d to catch block_%d\n", block->getNumber(), catchBlock->getNumber());
 
