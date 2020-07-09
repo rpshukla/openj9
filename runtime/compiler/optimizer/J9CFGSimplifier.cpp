@@ -34,14 +34,13 @@
 
 bool J9::CFGSimplifier::simplifyIfPatterns(bool needToDuplicateTree)
    {
-   static char *enableCFGSimplification = feGetEnv("TR_enableCFGSimplificaiton");
-   if (enableCFGSimplification == NULL)
-      return false;
-
+   return OMR::CFGSimplifier::simplifyIfPatterns(needToDuplicateTree);
+   /*
    return OMR::CFGSimplifier::simplifyIfPatterns(needToDuplicateTree)
           || simplifyResolvedRequireNonNull(needToDuplicateTree)
           || simplifyUnresolvedRequireNonNull(needToDuplicateTree)
           ;
+   */
    }
 
 // Look for pattern of the form:
